@@ -15,6 +15,8 @@ Dashboard stock accuracy hasil cycle count gudang Tegal. Untuk pemakaian interna
 - Python tidak terpasang. Uji UI otomatis memakai jsdom dan fake-indexeddb yang dipasang di folder sementara di luar repo (tidak ikut repo).
 - Setiap kali bentuk data hasil bacaan berubah, naikkan `SCHEMA` di `js/store.js`.
 
+Alasan di balik keputusan, hasil analisis data, dan pertanyaan untuk tim ada di `#riwayat` (steering manual, panggil di chat kalau perlu detail).
+
 ## Struktur
 `index.html`, `css/style.css`, `js/parse.js` (baca tab, bersihkan label, kode SAP, tab penyebab), `js/calc.js` (semua hitungan), `js/export.js`, `js/store.js` (cache IndexedDB), `js/ui.js`, `scripts/backtest.js`, `tests/`, `lib/` (SheetJS, Chart.js). README.md berisi rumus dan fitur lengkap.
 
