@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cycle Count Dashboard</title>
+<link rel="stylesheet" href="css/style.css">
+<script>
+  // Terapkan tema sebelum render supaya tidak berkedip.
+  (function () {
+    var t = null;
+    try { t = localStorage.getItem('cc.theme'); } catch (e) {}
+    if (!t) t = window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', t);
+  })();
+</script>
+</head>
+<body>
+<div class="layout">
+  <aside class="side">
+    <div class="logo">Cycle Count<small>Dashboard stock accuracy - Gudang Tegal</small></div>
+
+    <label class="btn primary" style="cursor:pointer">Upload .xlsx
+      <input id="file" type="file" accept=".xlsx,.xls" hidden>
+    </label>
+    <div id="status" class="status"></div>
+    <button id="clearCache" type="button" class="hidden">Hapus data tersimpan</button>
+
+    <div id="controls" class="hidden">
+      <div class="field"><label class="lab" for="fMonth">Bulan</label><select id="fMonth"></select></div>
+      <div class="field"><label class="lab" for="fBrand">Brand</label><select id="fBrand"></select></div>
+      <div class="field"><label class="lab" for="fPic">PIC</label><select id="fPic"></select></div>
+      <div class="field"><label class="lab" for="fCls">Kelas SKU</label><select id="fCls"></select></div>
+      <div class="field"><label class="lab" for="fDate">Tanggal</label><select id="fDate"></select></div>
+      <div class="field"><label class="lab" for="fSearch">Cari SKU / produk</label><input id="fSearch" type="search" placeholder="Ketik SKU atau nama"></div>
+      <label class="check"><input id="fGap" type="checkbox"> Hanya yang selisih</label>
+      <label class="check"><input id="fBelow" type="checkbox"> Di bawah target saja</label>
+      <div class="field"><label class="lab" for="fTarget">Target akurasi (%)</label><input id="fTarget" type="number" min="0" max="100" step="0.1" value="99"></div>
+      <button id="reset" type="button">Reset filter</button>
+
+      <div class="sep"></div>
+      <button id="expCsv" type="button">Unduh CSV</button>
+      <button id="expXlsx" type="button">Unduh Excel</button>
+      <button id="print" type="button">Cetak / simpan PDF</button>
+    </div>
+
+    <div class="sep"></div>
+    <button id="theme" type="button">Mode gelap</button>
+  </aside>
+
+  <main>
+    <h1 class="page-title">Akurasi Stok Cycle Count</h1>
+    <div id="sub" class="sub">Heron (sistem) vs Real (fisik)</div>
+
+    <div id="empty" class="empty">
+      Upload <b>CYCLE COUNT TEGAL.xlsx</b> lewat tombol di kiri.
+    </div>
+
+    <div id="app" class="hidden">
+      <nav class="tabs no-print" id="tabs">
+        <button type="button" data-tab="ringkasan" class="on">Ringkasan</button>
+        <button type="button" data-tab="split">Storage vs Display</button>
+        <button type="button" data-tab="kelas">Kelas &amp; Cakupan</button>
+        <button type="button" data-tab="risiko">Risiko</button>
+        <button type="button" data-tab="penyebab" id="tabPenyebab">Penyebab</button>
+        <button type="button" data-tab="prioritas">Prioritas</button>
+        <button type="button" data-tab="detail">Detail SKU</button>
+      </nav>
+
+      <!-- ===== RINGKASAN ===== -->
+      <section class="tab" id="tab-ringkasan">
+        <div class="panel headline">
+          <div id="hlBig" class="hl-big"></div>
+          <div id="hlLine" class="hl-line"></div>
+          <ul id="highlights"></ul>
+        </div>
+
+        <div class="cards">
+          <div class="card" id="cardAcc"><div class="k">Akurasi total</div><div class="v" id="cAcc">-</div><div class="s" id="cAccS"></div></div>
+          <div class="card"><div class="k">SKU dihitung</div><div class="v" id="cSku">-</div><div class="s" id="cSkuS"></div></div>
+          <div class="card"><div class="k">Baris cocok (100%)</div><div class="v" id="cMatch">-</div><div class="s" id="cMatchS"></div></div>
+          <div class="card low"><div class="k">Di bawah target</div><div class="v" id="cBelow">-</div><div class="s" id="cBelowS"></div></div>
+          <div class="card"><div class="k">Selisih net</div><div class="v" id="cGap">-</div><div class="s" id="cGapS"></div></div>
+        </div>
+
+        <div class="panel">
+          <h2>Selisih terkonsentrasi di sedikit SKU</h2>
+          <div class="chips" id="parChips"></div>
+          <div class="chart tall"><canvas id="chPareto"></canvas></div>
+        </div>
+
+        <div class="panel">
+          <h2>Tren akurasi antar bulan</h2>
+          <div class="chart tall"><canvas id="chTrend"></canvas></div>
+        </div>
+
+        <div class="grid">
+          <div class="panel"><h2>Akurasi per hari</h2><div class="chart"><canvas id="chDay"></canvas></div></div>
+          <div class="panel"><h2>Akurasi per brand</h2><div class="chart"><canvas id="chBrand"></canvas></div></div>
+          <div class="panel"><h2>Akurasi per PIC</h2><div class="chart"><canvas id="chPic"></canvas></div></div>
+        </div>
+
+        <div class="panel">
+          <h2>Lebih vs kurang per bulan (pcs)</h2>
+          <div class="hint">Lebih: Real &gt; Heron. Kurang: Real &lt; Heron.</div>
+          <div class="chart"><canvas id="chOver"></canvas></div>
+        </div>
+      </section>
+
+      <!-- ===== STORAGE VS DISPLAY ===== -->
+      <section class="tab hidden" id="tab-split">
+        <div class="panel insight">
+          <div id="splitMsg" class="big-msg"></div>
+        </div>
+
+        <div class="cards two">
+          <div class="card" id="cardStorage"><div class="k">Akurasi storage</div><div class="v" id="sAcc">-</div><div class="s" id="sAccS"></div></div>
+          <div class="card" id="cardDisplay"><div class="k">Akurasi display</div><div class="v" id="dAcc">-</div><div class="s" id="dAccS"></div></div>
+        </div>
+
+        <div class="panel">
+          <h2>Tren akurasi storage vs display</h2>
+          <div class="chart tall"><canvas id="chSplitTrend"></canvas></div>
+        </div>
+
+        <div class="grid">
+          <div class="panel"><h2>Per brand</h2><div class="chart"><canvas id="chSplitBrand"></canvas></div></div>
+          <div class="panel"><h2>Per PIC</h2><div class="chart"><canvas id="chSplitPic"></canvas></div></div>
+        </div>
+      </section>
+
+      <!-- ===== KELAS & CAKUPAN ===== -->
+      <section class="tab hidden" id="tab-kelas">
+        <div class="grid">
+          <div class="panel">
+            <h2>Akurasi per kelas SKU</h2>
+            <div class="chart"><canvas id="chClass"></canvas></div>
+          </div>
+          <div class="panel">
+            <h2>Cakupan hitung</h2>
+            <div class="hint" id="covHint"></div>
+            <div class="tablewrap short"><table><thead><tr>
+              <th>Kelas</th><th class="n">Total SKU</th><th class="n">Sudah dihitung</th><th class="n">Belum</th><th>Cakupan</th><th class="n">Akurasi</th>
+            </tr></thead><tbody id="covBody"></tbody></table></div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h2>SKU yang belum dihitung</h2>
+          <div class="hint" id="uncHint"></div>
+          <div class="tablewrap short"><table><thead><tr>
+            <th>Kelas</th><th>SKU No</th><th>Produk</th><th>Brand</th><th class="n">Penjualan</th>
+          </tr></thead><tbody id="uncBody"></tbody></table></div>
+        </div>
+      </section>
+
+      <!-- ===== RISIKO ===== -->
+      <section class="tab hidden" id="tab-risiko">
+        <div class="panel">
+          <div class="row-between">
+            <h2>Risiko selisih berikutnya</h2>
+            <div class="no-print">
+              <button id="riskCsv" type="button">Unduh CSV</button>
+              <button id="riskXlsx" type="button">Unduh Excel per PIC</button>
+            </div>
+          </div>
+          <div class="hint" id="riskHint"></div>
+          <div class="tablewrap"><table><thead><tr>
+            <th class="n">Skor</th><th>SKU No</th><th>Kode SAP</th><th>Produk</th><th>Brand</th><th>Kelas</th><th>PIC</th><th>Alasan</th>
+          </tr></thead><tbody id="riskBody"></tbody></table></div>
+        </div>
+      </section>
+
+      <!-- ===== PENYEBAB ===== -->
+      <section class="tab hidden" id="tab-penyebab">
+        <div class="grid">
+          <div class="panel">
+            <h2>Laporan human error per kategori</h2>
+            <div class="hint" id="causeHint"></div>
+            <div class="chart"><canvas id="chCause"></canvas></div>
+          </div>
+          <div class="panel">
+            <h2>Per area</h2>
+            <div class="chart"><canvas id="chArea"></canvas></div>
+          </div>
+        </div>
+        <div class="panel">
+          <h2>Laporan per bulan</h2>
+          <div class="chart"><canvas id="chCauseMonth"></canvas></div>
+        </div>
+        <div class="panel" id="pgPanel">
+          <h2>Sumber potensi gap dan penanggung jawab</h2>
+          <div class="tablewrap short"><table><thead><tr>
+            <th class="n">No</th><th>Sumber potensi gap</th><th>Penanggung jawab</th>
+          </tr></thead><tbody id="pgBody"></tbody></table></div>
+        </div>
+      </section>
+
+      <!-- ===== PRIORITAS ===== -->
+      <section class="tab hidden" id="tab-prioritas">
+        <div class="grid">
+          <div class="panel">
+            <h2>Ranking PIC</h2>
+            <div class="tablewrap short"><table><thead><tr>
+              <th>#</th><th>PIC</th><th class="n">Baris</th><th class="n">Akurasi</th><th class="n">Di bawah target</th><th class="n">Selisih abs</th>
+            </tr></thead><tbody id="rankPic"></tbody></table></div>
+          </div>
+          <div class="panel">
+            <h2>Ranking brand</h2>
+            <div class="tablewrap short"><table><thead><tr>
+              <th>#</th><th>Brand</th><th class="n">Baris</th><th class="n">Akurasi</th><th class="n">Di bawah target</th><th class="n">Selisih abs</th>
+            </tr></thead><tbody id="rankBrand"></tbody></table></div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h2>SKU bermasalah berulang</h2>
+          <div class="hint" id="probHint"></div>
+          <div class="tablewrap short"><table><thead><tr>
+            <th>SKU No</th><th>Kode SAP</th><th></th>Produk</th><th>Brand</th><th class="n">Bulan bermasalah</th><th>Akurasi per bulan</th><th class="n">Selisih abs</th>
+          </tr></thead><tbody id="probBody"></tbody></table></div>
+        </div>
+      </section>
+
+      <!-- ===== DETAIL SKU ===== -->
+      <section class="tab hidden" id="tab-detail">
+        <div class="panel" id="tablePanel">
+          <h2>Akurasi per SKU (Heron vs Real)</h2>
+          <div class="tablewrap"><table><thead><tr id="thead"></tr></thead><tbody id="tbody"></tbody></table></div>
+          <div class="pager">
+            <button id="prev" type="button">&laquo;</button><span id="pageInfo"></span><button id="next" type="button">&raquo;</button>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<script src="lib/xlsx.full.min.js"></script>
+<script src="lib/chart.umd.js"></script>
+<script src="js/calc.js"></script>
+<script src="js/parse.js"></script>
+<script src="js/export.js"></script>
+<script src="js/store.js"></script>
+<script src="js/ui.js"></script>
+</body>
+</html>

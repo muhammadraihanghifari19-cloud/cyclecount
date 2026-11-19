@@ -1,0 +1,14 @@
+# Company data: never commit
+data/
+*.xlsx
+*.xls
+*.csv
+
+node_modules/
+.next/
+out/
+build/
+coverage/
+.env*
+!.env.example
+*.tsbuildinfo

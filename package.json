@@ -1,0 +1,10 @@
+{
+  "name": "cycle-count-dashboard",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Dashboard stock accuracy cycle count gudang Tegal",
+  "scripts": {
+    "test": "node --test",
+    "backtest": "node scripts/backtest.js"
+  }
+}
