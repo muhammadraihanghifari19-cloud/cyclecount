@@ -103,18 +103,36 @@
       if (!res.classList.length) msg += ' Tab SKU CLASS tidak ditemukan, kelas dan cakupan tidak tersedia.';
       if (res.skipped.length) msg += ' Dilewati (header tidak lengkap): ' + res.skipped.join(', ') + '.';
       applyData(res, msg);
-      const saved = await S.save({ rows: res.rows, months: res.months, classList: res.classList,
-                                   humanErrors: res.humanErrors, potentialGaps: res.potentialGaps,
-                                   meta: { name: file.name, savedAt: Date.now() } });
-      if (saved) { $('clearCache').classList.remove('hidden'); status(msg + ' Tersimpan di browser ini.'); }
+      state.saveData = { rows: res.rows, months: res.months, classList: res.classList,
+                         humanErrors: res.humanErrors, potentialGaps: res.potentialGaps,
+                         meta: { name: file.name, savedAt: Date.now() } };
+      if ($('persist').checked) await persistNow(msg);
     } catch (e) {
       status('Gagal membaca file: ' + e.message, true);
     }
   }
 
+  /* ---------- penyimpanan di perangkat (opsional) ---------- */
+  // Bawaan mati: data hanya ada selama halaman terbuka. Kalau dicentang, hasil bacaan disimpan di browser
+  // ini (IndexedDB, tidak dikirim ke mana pun) supaya tidak perlu upload ulang.
+  function getFlag() { try { return localStorage.getItem('cc.persist'); } catch (e) { return null; } }
+  function setFlag(v) { try { localStorage.setItem('cc.persist', v); } catch (e) {} }
+
+  async function persistNow(msg) {
+    const ok = await S.save(state.saveData);
+    const pre = msg ? msg + ' ' : '';
+    if (ok) { $('clearCache').classList.remove('hidden'); status(pre + 'Tersimpan di perangkat ini.'); }
+    else status(pre + 'Penyimpanan di browser tidak tersedia.', true);
+  }
+
   async function loadCached() {
+    const flag = getFlag();
+    if (flag === '0') return;
     const d = await S.load();
     if (!d || state.rows.length || !d.rows || !d.rows.length) return;
+    // Perangkat yang sudah punya data tersimpan sebelum ada pilihan ini dianggap sudah memilih menyimpan.
+    if (flag === null) { setFlag('1'); $('persist').checked = true; }
+    state.saveData = d;
     const when = d.meta && d.meta.savedAt ? new Date(d.meta.savedAt).toLocaleString('id-ID') : '';
     applyData(d, 'Data tersimpan: ' + (d.meta ? d.meta.name : '') + (when ? ' (' + when + ')' : '') +
                  '. Upload file baru untuk memperbarui.');
@@ -677,7 +695,19 @@
     $('clearCache').classList.add('hidden');
     status('Data tersimpan dihapus. Data yang sedang tampil tetap ada sampai halaman ditutup.');
   };
+  $('persist').onchange = async () => {
+    setFlag($('persist').checked ? '1' : '0');
+    if ($('persist').checked) {
+      if (state.saveData) await persistNow();
+      else status('Penyimpanan aktif. Data disimpan setelah upload berikutnya.');
+    } else {
+      await S.clear();
+      $('clearCache').classList.add('hidden');
+      status('Penyimpanan dimatikan dan data tersimpan dihapus.');
+    }
+  };
 
+  $('persist').checked = getFlag() === '1';
   loadTarget();
   $('theme').textContent = document.documentElement.getAttribute('data-theme') === 'dark' ? 'Mode terang' : 'Mode gelap';
   loadCached();

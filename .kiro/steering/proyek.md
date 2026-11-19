@@ -5,7 +5,7 @@ Dashboard stock accuracy hasil cycle count gudang Tegal. Untuk pemakaian interna
 ## Preferensi pengguna
 - Jawaban dan teks di halaman harus **singkat**. Tidak ada paragraf penjelasan di UI. Istilah gudang (Heron, Real, Gap, SKU, PIC) tidak perlu dijelaskan.
 - Pengguna awam logistik. Ambil keputusan sendiri kalau diserahkan, tulis asumsinya, dan tanya hanya untuk hal yang benar-benar perlu.
-- Data perusahaan **tidak disimpan di server**. Tiap pengguna upload Excel dari laptopnya sendiri, dan halaman memprosesnya di browser. Tidak ada backend.
+- Data perusahaan **tidak disimpan di server**. Tiap pengguna upload Excel dari laptopnya sendiri, dan halaman memprosesnya di browser. Tidak ada backend. Penyimpanan di browser (IndexedDB) bersifat opsional lewat kotak "Simpan di perangkat ini", bawaan mati.
 - Jangan commit data perusahaan (`data/`, `*.xlsx`, `*.csv` sudah di `.gitignore`). Tes memakai data tiruan.
 - Jangan push ke GitHub atau deploy tanpa izin pengguna.
 
@@ -38,7 +38,7 @@ Dashboard stock accuracy hasil cycle count gudang Tegal. Untuk pemakaian interna
 - Kotak "Pertanyaan cepat" (tombol laporan dan pencocokan kata kunci), lalu asisten AI sebagai penerjemah pertanyaan ke laporan. AI lokal: Ollama di laptop pribadi (RAM 16 GB, RTX 3050 4 GB VRAM), mulai dengan `qwen3.5:4b`, naik ke `qwen3:8b` kalau kurang pintar. Alternatif: Gemini API gratis dengan kunci milik pengguna. Kunci API tidak boleh ditanam di berkas halaman. AI hanya menerjemahkan pertanyaan jadi perintah laporan, perhitungan tetap oleh kode.
 - Kartu "Baris cocok" tanpa baris stok nol, dan penanda "dihitung ulang" di tabel Detail SKU.
 - Pilihan penilaian per SKU saja (varian digabung). Hanya kalau ada yang meminta.
-- Penyimpanan di browser jadi opsional (bawaan mati), alias PIC dipindah dari kode ke pengaturan, `.vercelignore`, `noindex`, lalu hosting statis (Vercel atau lainnya).
+- Alias PIC dipindah dari kode ke pengaturan, `.vercelignore`, `noindex`, lalu hosting statis (Vercel atau lainnya). Keputusan: link terbuka tanpa nama orang di kode, proteksi Vercel bisa dinyalakan kemudian. Repo GitHub harus private.
 - Uji visual: sebagian tampilan sudah dilihat pengguna di Chrome. Grafik tab Risiko dan Penyebab, hasil cetak PDF, dan unduhan Excel per PIC belum diperiksa manual.
 
 ## Lingkungan

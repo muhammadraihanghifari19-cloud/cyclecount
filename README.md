@@ -8,7 +8,7 @@ Dashboard stock accuracy dari hasil cycle count gudang Tegal (tab "CC BY HERON <
 2. Klik **Upload .xlsx** dan pilih file CYCLE COUNT TEGAL.
 3. Tunggu sampai selesai. File besar (sekitar 20 MB) butuh sekitar 20-35 detik karena dibaca di browser.
 
-Setelah upload pertama, hasil bacaan disimpan di browser ini (IndexedDB). Saat halaman dibuka lagi, data langsung tampil tanpa upload ulang. Upload file baru untuk memperbarui, atau klik **Hapus data tersimpan** untuk menghapusnya. Data tidak pernah dikirim ke server dan hanya ada di komputer ini. Library ada di `lib/`, jadi tidak perlu internet.
+Data tidak pernah dikirim ke server. Bawaannya data hanya ada selama halaman terbuka, jadi perlu upload ulang setiap kali halaman dibuka. Kalau mau data tersimpan di perangkat itu (IndexedDB di browser), centang **Simpan di perangkat ini** di sidebar. Setelah itu data langsung tampil saat halaman dibuka lagi. Mematikan centang atau klik **Hapus data tersimpan** menghapusnya. Pakai pilihan ini hanya di perangkat yang boleh menyimpan data. Perangkat yang sudah punya data tersimpan sebelum pilihan ini ada dianggap sudah memilih menyimpan. Library ada di `lib/`, jadi tidak perlu internet.
 
 Folder `data/` dan semua file `.xlsx`/`.csv` diabaikan git karena berisi data perusahaan. Jangan di-commit.
 
