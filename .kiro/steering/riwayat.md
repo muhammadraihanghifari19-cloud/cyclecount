@@ -16,7 +16,7 @@ Dipanggil dengan `#riwayat` di chat. Ringkasan alasan di balik keputusan dan has
 
 ## Keputusan dan alasannya
 - **Upload Excel di browser, tanpa backend.** Data perusahaan tidak boleh tersimpan di server. Pengguna menegaskan: web hanya menerima upload dan menampilkan, tiap orang upload dari laptopnya sendiri.
-- **Rumus akurasi total** diambil dari tab "coretan itung akurasi" di spreadsheet (1 - selisih absolut / total Heron).
+- **Rumus akurasi total:** awalnya memakai rumus absolut dari tab "coretan itung akurasi". Audit kemudian menunjukkan tab Review per month, dashboard Excel, dan pivot per tanggal memakai rumus **netto** (1 - |total Real - total Heron| / total Heron). Dengan netto target 99% tercapai di 4 dari 11 bulan, dengan absolut tidak satu pun, jadi headline versi absolut bisa bertentangan dengan Excel. Sekarang keduanya ditampilkan berdampingan dan pilihannya ada di sidebar, bawaan netto. Heron dan Real per brand per bulan sudah dicek sama dengan tab Review (8 dari 12 pasangan persis sama, sisanya hampir sama, kecuali satu pasangan Januari yang berbeda sekitar 2,5% karena tab Review diisi manual).
 - **Label Brand dan PIC dibersihkan** karena diisi manual: huruf besar/kecil campur, nama pendek bergantian dengan nama lengkap, typo, dan sebagian terisi kode koordinat (ada di dua bulan).
 - **Item dinilai per SKU + kode SAP.** Buktinya: SKU yang sama dengan dua kode SAP punya Heron dan Real sendiri-sendiri, dihitung di hari berbeda. Pada Januari dan Februari ada storage yang tercatat per rak sehingga terhitung dua kali pada beberapa SKU, dampaknya di bawah 1% dan tidak diperbaiki.
 - **Display = total - storage.** Di tab bulan, dua baris di Agustus tidak konsisten di sumbernya (total tidak sama dengan storage + display). Dengan definisi ini, storage + display selalu sama dengan total.
@@ -38,7 +38,7 @@ Dipanggil dengan `#riwayat` di chat. Ringkasan alasan di balik keputusan dan has
 - Selisih bisa dua arah (lebih dan kurang berimbang). Pengguna menjelaskan sebagian selisih kecil wajar karena stok sistem bergerak (orang checkout) saat fisik dihitung. Arah efeknya belum dipastikan. Sebagian besar selisih diyakini human error.
 - Laporan human error: 457 laporan (Juni 2025 sampai November 2026), tapi hanya 65 di 2026. Kategori utama: salah penempatan, belum terinject link overmodal, FEFO tidak tepat, selisih stok.
 - Tab yang diperiksa dan tidak dipakai: Finding Report (catatan bebas), Item Selisih (satu hari, Februari 2025), CEK SELISIH (tautan prosedur). Kolom UU ET02 rusak, tab UU SAP satu potret waktu, tidak ada kolom harga, kolom CT kosong.
-- Kelas A (laku) menyumbang sebagian besar stok dan akurasi tertinggi, kelas C terendah. Kelas A dihitung tidak lebih sering daripada kelas lain.
+- Tab Summary berisi "skema dan productivity" (target 500 SKU kelas AA-A per bulan, 4 orang, 20,8 SKU per orang per hari) dan tab TIMELINE berisi jadwal hitung per brand dan kelas. Pengguna memutuskan ini tidak perlu ditampilkan. Fokus dashboard: akurasi stok dan perbandingan Heron vs Real.`n- Kelas A (laku) menyumbang sebagian besar stok dan akurasi tertinggi, kelas C terendah. Kelas A dihitung tidak lebih sering daripada kelas lain.
 
 ## Pertanyaan untuk tim (belum dijawab)
 1. Aturan frekuensi hitung per kelas (A tiap bulan? B tiap kuartal?).

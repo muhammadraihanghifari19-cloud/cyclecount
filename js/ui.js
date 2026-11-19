@@ -9,10 +9,11 @@
 
   const state = {
     rows: [], months: [], classList: [], humanErrors: [], potentialGaps: [], monthShort: {}, monthLabel: {},
-    target: 0.99, page: 0, sortKey: 'absGap', sortDir: -1, charts: {}, tab: 'ringkasan', list: []
+    target: 0.99, mode: 'net', page: 0, sortKey: 'absGap', sortDir: -1, charts: {}, tab: 'ringkasan', list: []
   };
 
   /* ---------- format dan helper DOM ---------- */
+  const modeName = () => (state.mode === 'net' ? 'netto' : 'absolut');
   const fmt = n => Number(n).toLocaleString('id-ID', { maximumFractionDigits: 2 });
   const pct = v => (v * 100).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%';
   const pct0 = v => Math.round(v * 100).toLocaleString('id-ID') + '%';
@@ -153,6 +154,7 @@
     renderRanks(list);
     renderProblems(probs);
     renderRisk(f);
+    renderCompare(list, scope);
     renderCauses();
     renderTable();
     renderHeadline(list);
@@ -167,14 +169,18 @@
     const big = $('hlBig'), line = $('hlLine');
     big.textContent = ''; line.textContent = '';
     if (!list.length) { big.textContent = 'Tidak ada data untuk filter ini.'; return; }
-    const s = C.summarize(list), p = C.pareto(list, state.target);
+    const s = C.summarize(list, undefined, state.mode), o = C.overUnder(list);
+    const n0 = v => Math.round(v).toLocaleString('id-ID');
     big.appendChild(el('span', 'num ' + accClass(s.acc), pct(s.acc)));
     const d = (s.acc - state.target) * 100;
-    big.appendChild(document.createTextNode('akurasi, target ' + fmt(state.target * 100) + '% (' +
+    big.appendChild(document.createTextNode('akurasi ' + modeName() + ', target ' + fmt(state.target * 100) + '% (' +
       (d >= 0 ? 'lewat ' : 'kurang ') + Math.abs(d).toLocaleString('id-ID', { maximumFractionDigits: 2 }) + ' poin)'));
-    const n0 = v => Math.round(v).toLocaleString('id-ID');
-    line.textContent = 'Selisih ' + n0(p.total) + ' pcs dari ' + n0(p.heron) + ' pcs stok. Batas untuk capai target ' +
-      n0(p.allowed) + ' pcs' + (p.need > 0 ? ', jadi selisih perlu turun ' + n0(p.need) + ' pcs.' : '. Target tercapai.');
+    // Selisih yang dibandingkan dengan batas mengikuti mode: netto = |total Real - total Heron|, absolut = jumlah selisih per baris.
+    const gap = state.mode === 'net' ? Math.abs(s.net) : s.abs;
+    const allowed = s.heron - s.heron * state.target, need = Math.max(0, gap - allowed);
+    line.textContent = 'Netto ' + pct(s.accNet) + ' | Absolut ' + pct(s.accAbs) + '. Lebih ' + n0(o.over) + ' dan kurang ' + n0(o.under) +
+      ' pcs saling menutupi, total pcs yang salah ' + n0(s.abs) + '. Batas selisih ' + modeName() + ' untuk target ' + n0(allowed) + ' pcs' +
+      (need > 0 ? ', perlu turun ' + n0(need) + ' pcs.' : '. Target tercapai.');
   }
 
   function renderPareto(list) {
@@ -219,24 +225,26 @@
   }
 
   function renderCards(f, list) {
-    const s = C.summarize(list, state.target);
+    const s = C.summarize(list, state.target, state.mode);
     $('cAcc').textContent = pct(s.acc);
+    $('cAccK').textContent = 'Akurasi ' + modeName();
     $('cardAcc').className = 'card ' + (s.n ? accClass(s.acc) : '');
-    $('cardAcc').title = 'Akurasi total = 1 - total |Real - Heron| / total Heron. Akurasi SKU = 1 - |Real - Heron| / Heron.';
+    $('cardAcc').title = 'Netto = 1 - |total Real - total Heron| / total Heron (rumus tab Review dan dashboard Excel). ' +
+      'Absolut = 1 - jumlah |Real - Heron| per baris / total Heron. Akurasi per SKU sama di keduanya.';
     $('cAccS').textContent = '';
     if (f.month) {
       const prev = C.previousMonthKey(state.months.map(m => m.key), f.month);
       if (prev) {
         const p = C.filterRows(state.rows, { month: prev, brand: f.brand, pic: f.pic, cls: f.cls });
         if (p.length && s.n) {
-          const d = (s.acc - C.summarize(p).acc) * 100;
+          const d = (s.acc - C.summarize(p, undefined, state.mode).acc) * 100;
           $('cAccS').appendChild(el('span', d >= 0 ? 'up' : 'down',
             (d >= 0 ? '▲ ' : '▼ ') + Math.abs(d).toLocaleString('id-ID', { maximumFractionDigits: 2 }) + ' poin'));
           $('cAccS').appendChild(document.createTextNode(' vs ' + state.monthLabel[prev]));
         }
       }
     }
-    if (!$('cAccS').textContent) $('cAccS').textContent = 'Selisih abs ' + fmt(s.abs) + ' dari ' + fmt(s.heron);
+    if (!$('cAccS').textContent) $('cAccS').textContent = (state.mode === 'net' ? 'Absolut ' + pct(s.accAbs) : 'Netto ' + pct(s.accNet));
     $('cSku').textContent = fmt(new Set(list.map(r => r.sku)).size);
     $('cSkuS').textContent = fmt(s.n) + ' baris hitungan';
     $('cMatch').textContent = fmt(s.match);
@@ -292,13 +300,17 @@
     const keys = state.months.map(m => m.key);
     const labels = keys.map(k => state.monthShort[k]);
 
-    const t = C.trend(scope, keys);
-    const sets = t.series.map((s, i) => lineSet(s.name, s.data, i === 0 ? css('--ink') : PALETTE[(i - 1) % PALETTE.length], i === 0));
+    const t = C.trend(scope, keys, state.mode);
+    const sets = t.series.map((s, i) => lineSet(i === 0 ? 'Total ' + modeName() : s.name, s.data, i === 0 ? css('--ink') : PALETTE[(i - 1) % PALETTE.length], i === 0));
+    // Total dengan rumus lainnya sebagai garis putus-putus, supaya jarak netto dan absolut kelihatan.
+    const other = C.trend(scope, keys, state.mode === 'net' ? 'abs' : 'net').series[0].data;
+    sets.splice(1, 0, Object.assign(lineSet('Total ' + (state.mode === 'net' ? 'absolut' : 'netto'), other, css('--mute')),
+      { borderDash: [3, 3], borderWidth: 1.5, pointRadius: 2 }));
     sets.push(targetSet(keys.length));
     drawChart('chTrend', { type: 'line', labels, datasets: sets, legend: true });
 
     const bars = (id, key) => {
-      const g = C.groupSummary(list, key, state.target);
+      const g = C.groupSummary(list, key, state.target, state.mode);
       drawChart(id, {
         type: 'bar', labels: g.map(x => x.key),
         datasets: [{ type: 'bar', label: 'Akurasi', data: g.map(x => p2(x.acc)), order: 1,
@@ -306,7 +318,7 @@
                    targetSet(g.length)]
       });
     };
-    const day = C.groupSummary(list, 'date', state.target);
+    const day = C.groupSummary(list, 'date', state.target, state.mode);
     drawChart('chDay', { type: 'line', labels: day.map(x => x.key),
       datasets: [lineSet('Akurasi', day.map(x => x.acc), css('--accent')), targetSet(day.length)] });
     bars('chBrand', 'brand');
@@ -324,7 +336,7 @@
 
   /* ---------- storage vs display ---------- */
   function renderSplit(list, scope) {
-    const s = C.splitSummary(list);
+    const s = C.splitSummary(list, state.mode);
     const keys = state.months.map(m => m.key), labels = keys.map(k => state.monthShort[k]);
     if (!s) {
       $('splitMsg').textContent = 'Data pemisahan storage dan display tidak tersedia untuk pilihan ini.';
@@ -343,12 +355,12 @@
       $('dAccS').textContent = 'Selisih abs ' + fmt(s.display.abs) + ' dari Heron ' + fmt(s.display.heron);
     }
 
-    const tr = C.splitTrend(scope, keys);
+    const tr = C.splitTrend(scope, keys, state.mode);
     drawChart('chSplitTrend', { type: 'line', labels, legend: true, datasets: [
       lineSet('Storage', tr.storage, css('--accent'), true), lineSet('Display', tr.display, COLOR_DISPLAY, true), targetSet(keys.length)] });
 
     const grouped = (id, key) => {
-      const g = C.splitGroup(list, key);
+      const g = C.splitGroup(list, key, state.mode);
       drawChart(id, { type: 'bar', labels: g.map(x => x.key), legend: true, datasets: [
         { type: 'bar', label: 'Storage', data: g.map(x => p2(x.storage)), backgroundColor: css('--accent'), order: 1 },
         { type: 'bar', label: 'Display', data: g.map(x => p2(x.display)), backgroundColor: COLOR_DISPLAY, order: 1 },
@@ -361,7 +373,7 @@
   /* ---------- kelas dan cakupan ---------- */
   function renderClass(f) {
     const noCls = C.filterRows(state.rows, Object.assign({}, f, { cls: '' }));
-    const cs = C.classSummary(noCls, state.target);
+    const cs = C.classSummary(noCls, state.target, state.mode);
     drawChart('chClass', {
       type: 'bar', labels: cs.map(x => x.key),
       datasets: [{ type: 'bar', label: 'Akurasi', data: cs.map(x => p2(x.acc)), order: 1,
@@ -414,7 +426,7 @@
   /* ---------- ranking ---------- */
   function renderRank(tbodyId, list, key, selectId) {
     const tb = $(tbodyId); tb.textContent = '';
-    C.rankByAcc(C.groupSummary(list, key, state.target)).forEach((g, i) => {
+    C.rankByAcc(C.groupSummary(list, key, state.target, state.mode)).forEach((g, i) => {
       const tr = el('tr', 'click');
       tr.title = 'Klik untuk memfilter';
       tr.appendChild(el('td', '', String(i + 1)));
@@ -458,6 +470,36 @@
       };
       tb.appendChild(tr);
     }
+  }
+
+  /* ---------- perbandingan Heron vs Real ---------- */
+  function cmpFill(tbodyId, rows, labelOf, total) {
+    const tb = $(tbodyId); tb.textContent = '';
+    if (!rows.length) { emptyRow(tb, 9, 'Tidak ada data.'); return; }
+    const add = (r, label, cls) => {
+      const tr = el('tr', cls);
+      tr.appendChild(el('td', '', label));
+      tr.appendChild(el('td', 'n', fmt(r.n)));
+      tr.appendChild(el('td', 'n', fmt(r.heron)));
+      tr.appendChild(el('td', 'n', fmt(r.real)));
+      const tg = el('td', 'n', signed(r.net));
+      if (r.net) tg.style.color = r.net > 0 ? css('--ok') : css('--bad');
+      tr.appendChild(tg);
+      tr.appendChild(el('td', 'n', fmt(r.over)));
+      tr.appendChild(el('td', 'n', fmt(r.under)));
+      for (const a of [r.accNet, r.accAbs]) { const td = el('td', 'n'); td.appendChild(pill(a)); tr.appendChild(td); }
+      tb.appendChild(tr);
+    };
+    rows.forEach(r => add(r, labelOf(r.key), ''));
+    if (total) add(total, 'Total', 'total');
+  }
+
+  function renderCompare(list, scope) {
+    const tot = l => { const s = C.summarize(l), o = C.overUnder(l);
+      return { n: s.n, heron: s.heron, real: s.real, net: s.net, over: o.over, under: o.under, accNet: s.accNet, accAbs: s.accAbs }; };
+    cmpFill('cmpMonth', C.compareTable(scope, 'monthKey'), k => state.monthLabel[k] || k, scope.length ? tot(scope) : null);
+    cmpFill('cmpBrand', C.compareTable(list, 'brand', 'heron'), k => k, list.length ? tot(list) : null);
+    cmpFill('cmpPic', C.compareTable(list, 'pic', 'heron'), k => k, list.length ? tot(list) : null);
   }
 
   /* ---------- risiko ---------- */
@@ -572,10 +614,10 @@
 
     // Kelompok dengan SKU sedikit diabaikan karena akurasinya mudah ekstrem.
     for (const [key, label] of [['brand', 'Brand'], ['pic', 'PIC']]) {
-      const r = C.rankByAcc(C.groupSummary(list, key, state.target)).filter(g => g.n >= MIN_GROUP && g.key !== 'Tidak diketahui');
+      const r = C.rankByAcc(C.groupSummary(list, key, state.target, state.mode)).filter(g => g.n >= MIN_GROUP && g.key !== 'Tidak diketahui');
       if (r.length > 1) add([label + ' terendah ', { b: r[0].key }, ' ' + pct(r[0].acc) + ' (' + r[0].n + ' baris)']);
     }
-    const s = C.splitSummary(list);
+    const s = C.splitSummary(list, state.mode);
     if (s) add(['Display: ', { b: pct0(s.displayAbsShare) }, ' dari selisih, ' + pct0(s.displayStockShare) + ' dari stok']);
     if (state.classList.length) {
       const a = C.coverage(state.classList, C.filterRows(state.rows, { month: f.month }), f.brand).find(x => x.key === 'A');
@@ -707,6 +749,14 @@
     }
   };
 
+  $('fMode').onchange = () => {
+    state.mode = $('fMode').value === 'abs' ? 'abs' : 'net';
+    try { localStorage.setItem('cc.mode', state.mode); } catch (e) {}
+    if (state.rows.length) render();
+  };
+
+  try { state.mode = localStorage.getItem('cc.mode') === 'abs' ? 'abs' : 'net'; } catch (e) {}
+  $('fMode').value = state.mode;
   $('persist').checked = getFlag() === '1';
   loadTarget();
   $('theme').textContent = document.documentElement.getAttribute('data-theme') === 'dark' ? 'Mode terang' : 'Mode gelap';

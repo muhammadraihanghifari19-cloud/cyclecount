@@ -28,7 +28,10 @@ Halaman punya lima tab, dan filter di sidebar berlaku untuk semuanya (bulan, bra
 ## Rumus
 
 - Akurasi SKU = 1 - |Real - Heron| / Heron (minimal 0%). Heron 0 dan Real 0 dihitung 100%. Heron 0 dan Real lebih dari 0 dihitung 0%.
-- Akurasi total = 1 - total selisih absolut / total Heron. Akurasi storage dan display dihitung dengan rumus yang sama pada porsinya masing-masing.
+- Akurasi gabungan (total, per brand, per PIC, per bulan, per hari) punya dua cara hitung, dan dashboard menampilkan keduanya:
+  - **Netto** = 1 - |total Real - total Heron| / total Heron. Ini rumus yang dipakai tab Review per month, dashboard Excel, dan pivot per tanggal. Lebih dan kurang saling menutupi.
+  - **Absolut** = 1 - jumlah |Real - Heron| per baris / total Heron. Lebih ketat, lebih dan kurang tidak saling menutupi (rumus tab "coretan itung akurasi").
+  - Pilihan di sidebar ("Akurasi gabungan") menentukan mana yang dipakai untuk angka utama, warna, grafik, dan ranking. Bawaannya netto supaya sama dengan Excel. Akurasi per SKU sama di keduanya. Akurasi storage dan display ikut pilihan itu.
 - Gap dihitung sendiri (Real - Heron), kolom Gap di spreadsheet tidak dipakai.
 - Lebih = SKU dengan Real > Heron. Kurang = Real < Heron. Angkanya dijumlah dalam pcs.
 - Sumber kolom: Total Heron dan Total Real di tab `CC BY HERON <BULAN> 26`, dibaca berdasarkan nama header. Storage diambil dari kolom `Stock Heron` dan `Stock Real` yang berdampingan, display = total dikurangi storage.

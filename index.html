@@ -37,6 +37,8 @@
       <label class="check"><input id="fGap" type="checkbox"> Hanya yang selisih</label>
       <label class="check"><input id="fBelow" type="checkbox"> Di bawah target saja</label>
       <div class="field"><label class="lab" for="fTarget">Target akurasi (%)</label><input id="fTarget" type="number" min="0" max="100" step="0.1" value="99"></div>
+      <div class="field"><label class="lab" for="fMode">Akurasi gabungan</label>
+        <select id="fMode"><option value="net">Netto (seperti Excel)</option><option value="abs">Absolut</option></select></div>
       <button id="reset" type="button">Reset filter</button>
 
       <div class="sep"></div>
@@ -60,6 +62,7 @@
     <div id="app" class="hidden">
       <nav class="tabs no-print" id="tabs">
         <button type="button" data-tab="ringkasan" class="on">Ringkasan</button>
+        <button type="button" data-tab="banding">Heron vs Real</button>
         <button type="button" data-tab="split">Storage vs Display</button>
         <button type="button" data-tab="kelas">Kelas &amp; Cakupan</button>
         <button type="button" data-tab="risiko">Risiko</button>
@@ -77,7 +80,7 @@
         </div>
 
         <div class="cards">
-          <div class="card" id="cardAcc"><div class="k">Akurasi total</div><div class="v" id="cAcc">-</div><div class="s" id="cAccS"></div></div>
+          <div class="card" id="cardAcc"><div class="k" id="cAccK">Akurasi total</div><div class="v" id="cAcc">-</div><div class="s" id="cAccS"></div></div>
           <div class="card"><div class="k">SKU dihitung</div><div class="v" id="cSku">-</div><div class="s" id="cSkuS"></div></div>
           <div class="card"><div class="k">Baris cocok (100%)</div><div class="v" id="cMatch">-</div><div class="s" id="cMatchS"></div></div>
           <div class="card low"><div class="k">Di bawah target</div><div class="v" id="cBelow">-</div><div class="s" id="cBelowS"></div></div>
@@ -105,6 +108,31 @@
           <h2>Lebih vs kurang per bulan (pcs)</h2>
           <div class="hint">Lebih: Real &gt; Heron. Kurang: Real &lt; Heron.</div>
           <div class="chart"><canvas id="chOver"></canvas></div>
+        </div>
+      </section>
+
+      <!-- ===== HERON VS REAL ===== -->
+      <section class="tab hidden" id="tab-banding">
+        <div class="panel">
+          <h2>Per bulan</h2>
+          <div class="tablewrap short"><table><thead><tr>
+            <th>Bulan</th><th class="n">Baris</th><th class="n">Heron</th><th class="n">Real</th><th class="n">Gap</th>
+            <th class="n">Lebih</th><th class="n">Kurang</th><th class="n">Netto</th><th class="n">Absolut</th>
+          </tr></thead><tbody id="cmpMonth"></tbody></table></div>
+        </div>
+        <div class="panel">
+          <h2>Per brand</h2>
+          <div class="tablewrap short"><table><thead><tr>
+            <th>Brand</th><th class="n">Baris</th><th class="n">Heron</th><th class="n">Real</th><th class="n">Gap</th>
+            <th class="n">Lebih</th><th class="n">Kurang</th><th class="n">Netto</th><th class="n">Absolut</th>
+          </tr></thead><tbody id="cmpBrand"></tbody></table></div>
+        </div>
+        <div class="panel">
+          <h2>Per PIC</h2>
+          <div class="tablewrap short"><table><thead><tr>
+            <th>PIC</th><th class="n">Baris</th><th class="n">Heron</th><th class="n">Real</th><th class="n">Gap</th>
+            <th class="n">Lebih</th><th class="n">Kurang</th><th class="n">Netto</th><th class="n">Absolut</th>
+          </tr></thead><tbody id="cmpPic"></tbody></table></div>
         </div>
       </section>
 

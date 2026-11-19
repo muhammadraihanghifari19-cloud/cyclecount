@@ -15,15 +15,21 @@
     return acc < target - 1e-9;
   }
 
-  // Ringkasan sekumpulan baris. Akurasi total = 1 - sum|gap| / sum Heron.
-  function summarize(list, target) {
+  // Ringkasan sekumpulan baris. Dua cara menghitung akurasi gabungan:
+  //   absolut (accAbs) = 1 - jumlah |Real - Heron| / jumlah Heron. Lebih dan kurang tidak saling menutupi.
+  //   netto   (accNet) = 1 - |jumlah Real - jumlah Heron| / jumlah Heron. Rumus di tab Review dan dashboard Excel.
+  // acc = pilihan sesuai mode ('net' atau lainnya = absolut). Akurasi per SKU sama di kedua cara.
+  function summarize(list, target, mode) {
     let heron = 0, real = 0, abs = 0, match = 0, below = 0;
     for (const r of list) {
       heron += r.heron; real += r.real; abs += r.absGap;
       if (r.gap === 0) match++;
       if (target !== undefined && isBelow(r.acc, target)) below++;
     }
-    return { n: list.length, heron, real, abs, match, below, acc: heron ? Math.max(0, 1 - abs / heron) : 1 };
+    const accAbs = heron ? Math.max(0, 1 - abs / heron) : 1;
+    const accNet = heron ? Math.max(0, 1 - Math.abs(real - heron) / heron) : 1;
+    return { n: list.length, heron, real, abs, net: real - heron, match, below, accAbs, accNet,
+             acc: mode === 'net' ? accNet : accAbs };
   }
 
   function groupBy(list, key) {
@@ -37,9 +43,9 @@
   }
 
   // Ringkasan per kelompok, diurutkan menurut nama kelompok.
-  function groupSummary(list, key, target) {
+  function groupSummary(list, key, target, mode) {
     return [...groupBy(list, key)]
-      .map(([k, v]) => Object.assign({ key: k }, summarize(v, target)))
+      .map(([k, v]) => Object.assign({ key: k }, summarize(v, target, mode)))
       .sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
   }
 
@@ -76,11 +82,11 @@
   }
 
   // Tren akurasi per bulan: satu seri "Total" dan satu seri per brand. null = tidak ada data.
-  function trend(rows, monthKeys) {
+  function trend(rows, monthKeys, mode) {
     const brands = [...new Set(rows.map(r => r.brand))].filter(Boolean).sort();
     const series = (pred) => monthKeys.map(k => {
       const l = rows.filter(r => r.monthKey === k && pred(r));
-      return l.length ? summarize(l).acc : null;
+      return l.length ? summarize(l, undefined, mode).acc : null;
     });
     return {
       labels: monthKeys,
@@ -131,8 +137,14 @@
     return heron > 0 ? Math.max(0, 1 - abs / heron) : (abs === 0 ? 1 : 0);
   }
 
+  // Satu bagian (storage atau display): akurasi absolut, netto, dan pilihan sesuai mode.
+  function part(heron, real, abs, mode) {
+    const accAbs = accOf(heron, abs), accNet = accOf(heron, Math.abs(real - heron));
+    return { heron, real, abs, accAbs, accNet, acc: mode === 'net' ? accNet : accAbs };
+  }
+
   // Ringkasan storage dan display. Baris tanpa pemisahan (sHeron null) dilewati. null kalau tidak ada baris.
-  function splitSummary(list) {
+  function splitSummary(list, mode) {
     let n = 0, sH = 0, sR = 0, sA = 0, dH = 0, dR = 0, dA = 0;
     for (const r of list) {
       if (r.sHeron === null || r.sHeron === undefined) continue;
@@ -143,29 +155,42 @@
     if (!n) return null;
     return {
       n,
-      storage: { heron: sH, real: sR, abs: sA, acc: accOf(sH, sA) },
-      display: { heron: dH, real: dR, abs: dA, acc: accOf(dH, dA) },
+      storage: part(sH, sR, sA, mode),
+      display: part(dH, dR, dA, mode),
       // Porsi display di total selisih absolut dan di total stok sistem.
       displayAbsShare: sA + dA ? dA / (sA + dA) : 0,
       displayStockShare: sH + dH ? dH / (sH + dH) : 0
     };
   }
 
-  function splitTrend(rows, monthKeys) {
+  function splitTrend(rows, monthKeys, mode) {
     const out = { storage: [], display: [] };
     for (const k of monthKeys) {
-      const s = splitSummary(rows.filter(r => r.monthKey === k));
+      const s = splitSummary(rows.filter(r => r.monthKey === k), mode);
       out.storage.push(s ? s.storage.acc : null);
       out.display.push(s ? s.display.acc : null);
     }
     return out;
   }
 
-  function splitGroup(list, key) {
+  function splitGroup(list, key, mode) {
     return [...groupBy(list, key)].map(([k, v]) => {
-      const s = splitSummary(v);
+      const s = splitSummary(v, mode);
       return { key: k, n: v.length, storage: s ? s.storage.acc : null, display: s ? s.display.acc : null };
     }).sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
+  }
+
+  /* ---------- perbandingan Heron vs Real ---------- */
+
+  // Tabel seperti tab "Review per month" di Excel: per kelompok, Heron, Real, gap netto, lebih, kurang,
+  // akurasi netto dan absolut. Urutan: key (bulan kronologis) atau Heron terbesar dulu (order = 'heron').
+  function compareTable(list, key, order) {
+    const rows = [...groupBy(list, key)].map(([k, v]) => {
+      const s = summarize(v), o = overUnder(v);
+      return { key: k, n: v.length, skus: new Set(v.map(r => r.sku)).size, heron: s.heron, real: s.real, net: s.net,
+               over: o.over, under: o.under, abs: s.abs, accNet: s.accNet, accAbs: s.accAbs };
+    });
+    return rows.sort(order === 'heron' ? (a, b) => b.heron - a.heron : (a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
   }
 
   /* ---------- selisih lebih vs kurang ---------- */
@@ -199,8 +224,8 @@
     return i >= 0 ? i : (c === 'Tanpa kelas' ? 99 : 50);
   }
 
-  function classSummary(list, target) {
-    return groupSummary(list, 'cls', target).sort((a, b) => classRank(a.key) - classRank(b.key) || (a.key < b.key ? -1 : 1));
+  function classSummary(list, target, mode) {
+    return groupSummary(list, 'cls', target, mode).sort((a, b) => classRank(a.key) - classRank(b.key) || (a.key < b.key ? -1 : 1));
   }
 
   // Daftar kelas per SKU (barcode): varian kemasan dengan kode SAP berbeda dihitung sebagai satu SKU,
@@ -401,6 +426,7 @@
   }
 
   return {
+    compareTable,
     causeCounts, causeByMonth, shiftMonth, annotateReports,
     riskScores, RISK_WEIGHTS, pareto, skuAcc, isBelow, summarize, groupBy, groupSummary, rankByAcc, filterRows, sortRows, trend, previousMonthKey, problemSkus,
     splitSummary, splitTrend, splitGroup, overUnder, overUnderTrend, classRank, classSummary, coverage, uncounted

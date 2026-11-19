@@ -23,7 +23,7 @@ Alasan di balik keputusan, hasil analisis data, dan pertanyaan untuk tim ada di 
 ## Keputusan penting
 - Tab sumber: `CC BY HERON <BULAN> 26` (11 bulan, kolom dibaca lewat nama header), `SKU CLASS` (kelas A/B/C), `REPORT HUMAN ERROR`, `POTENSIAL GAP`.
 - Item yang dinilai = **SKU + kode SAP** (stok Heron dan Real dicatat per kombinasi itu; varian kemasan punya angka sendiri). Kode Odoo diubah ke SAP: SAP = 4.000.000.000 + Odoo. Cakupan hitung dihitung per SKU saja.
-- Akurasi SKU = 1 - |Real - Heron| / Heron. Akurasi total = 1 - total selisih absolut / total Heron. Gap dihitung sendiri. Display = total - storage.
+- Akurasi SKU = 1 - |Real - Heron| / Heron. Akurasi gabungan punya dua cara: netto (1 - |total Real - total Heron| / total Heron, rumus tab Review dan dashboard Excel, bawaan di sidebar) dan absolut (1 - jumlah selisih per baris / total Heron). Dashboard menampilkan keduanya. Gap dihitung sendiri. Display = total - storage.
 - Kartu "SKU dihitung" menghitung SKU unik. Kartu dan tabel lain memakai **baris hitungan** (satu SKU bisa dihitung beberapa kali sebulan).
 - Warna akurasi: hijau di atas atau sama dengan target (bawaan 99%), kuning di bawah target tapi 95% ke atas, merah di bawah 95%. Kelas tidak ikut. Prioritas kerja memakai tab Risiko.
 - Skor risiko 0-100 dari riwayat 6 bulan (bobot di `RISK_WEIGHTS`, dipilih lewat backtest). Skor 80 ke atas = risiko tinggi. Laporan human error hanya jadi alasan tambahan.
