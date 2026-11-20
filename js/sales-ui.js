@@ -71,7 +71,7 @@
 
       const dates = C.uniqueDates(rows);
       const brands = [...new Set(rows.map(r => r.brand).filter(Boolean))].sort();
-      const mps = [...new Set(rows.map(r => r.marketplace).filter(Boolean))].sort();
+      const mps = [...new Set(state.rows.map(r => r.marketplace).filter(Boolean))].sort();
       setOptions($('fBrand'), 'Semua brand', brands);
       setOptions($('fMp'), 'Semua marketplace', mps);
       $('fFrom').value = dates[0] || '';
