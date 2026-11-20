@@ -38,13 +38,13 @@
   }
 
   // Konversi satu baris menjadi objek ringkas. maxPrice: batas atas harga (bawaan 100000).
-  function toRow(cols, idx, maxPrice) {
+  function toRow(cols, idx) {
     const sku = cols[idx.SKU] || '';
     const sapRaw = cols[idx.SAP_CODE] || '';
     const isBundle = cols[idx.IS_BUNDLE] === 'true';
     const qty = parseInt(cols[idx.QUANTITY]) || 0;
     const price = parsePrice(cols[idx.VALUE_HET]);
-    const valueHet = (price !== null && price >= 1 && price <= maxPrice) ? price : null;
+    const valueHet = (price !== null && price >= 1 && price <= 1000000) ? price : null;
     const date = parseDate(cols[idx.ORDER_TIMESTAMP]);
     return {
       date, monthKey: date ? date.slice(0, 7) : null,
@@ -60,9 +60,8 @@
   }
 
   // Parse satu teks CSV menjadi array baris objek.
-  // maxPrice: batas atas harga yang dianggap wajar. Harga di luar = valueHet null.
-  function parseCSV(text, maxPrice) {
-    maxPrice = maxPrice || 100000;
+  // Harga di atas Rp 1.000.000 dianggap ngaco dan di-null-kan (qty tetap dihitung).
+  function parseCSV(text) {
     const lines = text.split('\n');
     const header = parseRow(lines[0]);
     const idx = {};
@@ -76,7 +75,7 @@
       if (!line) continue;
       const cols = parseRow(line);
       if (cols.length !== header.length) { skipped++; continue; }
-      const r = toRow(cols, idx, maxPrice);
+      const r = toRow(cols, idx);
       if (!r.date) { skipped++; continue; }
       rows.push(r);
     }
@@ -99,13 +98,13 @@
   }
 
   // Browser: baca banyak File sekaligus, tampilkan progres.
-  async function loadFiles(files, maxPrice, onProgress) {
+  async function loadFiles(files, onProgress) {
     const results = [];
     for (let i = 0; i < files.length; i++) {
       const f = files[i];
       if (onProgress) onProgress('Membaca ' + f.name + ' (' + (i + 1) + '/' + files.length + ')...');
       const text = await f.text();
-      const r = parseCSV(text, maxPrice);
+      const r = parseCSV(text);
       results.push(Object.assign(r, { fileName: f.name, fileSize: f.size }));
       await new Promise(res => setTimeout(res, 0));
     }

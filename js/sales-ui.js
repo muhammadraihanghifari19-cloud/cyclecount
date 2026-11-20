@@ -42,11 +42,9 @@
   /* ---------- upload ---------- */
   $('file').addEventListener('change', async e => {
     const files = [...e.target.files]; if (!files.length) return;
-    const maxPrice = parseInt($('fMaxPrice').value) || 100000;
-    state.maxPrice = maxPrice;
     status('Membaca ' + files.length + ' file...');
     try {
-      const { merged, perFile } = await P.loadFiles(files, maxPrice, status);
+      const { merged, perFile } = await P.loadFiles(files, status);
       const ul = $('fileList'); ul.innerHTML = '';
       let totalDupe = 0;
       for (const f of perFile) {
@@ -83,7 +81,7 @@
       $('app').classList.remove('hidden');
       $('controls').classList.remove('hidden');
       const priceBad = C.priceStats(rows).nulled;
-      status(fmt(rows.length) + ' baris dari ' + files.length + ' file.' + (priceBad ? ' ' + fmt(priceBad) + ' baris harga di-null-kan (> Rp ' + fmt(maxPrice) + ').' : ''));
+      status(fmt(rows.length) + ' baris dari ' + files.length + ' file.' + (priceBad ? ' ' + fmt(priceBad) + ' baris harga di-null-kan (> Rp 1.000.000).' : ''));
       render();
     } catch (err) {
       status('Gagal: ' + err.message, true);
@@ -235,7 +233,6 @@
   /* ---------- event ---------- */
   ['fBrand', 'fMp', 'fFrom', 'fTo', 'fNonBundle'].forEach(id => $(id).onchange = render);
   $('fSearch').oninput = render;
-  $('fMaxPrice').onchange = () => { /* upload ulang diperlukan untuk ubah maxPrice */ status('Upload ulang file untuk menerapkan batas harga baru.'); };
   $('reset').onclick = () => {
     $('fBrand').value = ''; $('fMp').value = ''; $('fSearch').value = '';
     $('fNonBundle').checked = true;

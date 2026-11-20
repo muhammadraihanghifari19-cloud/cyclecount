@@ -37,7 +37,7 @@ function makeRow(o) {
 
 test('parseCSV: baris valid, harga ngaco di-null-kan, bundle terdeteksi', () => {
   const csv = [CSV_HEADER, makeRow({}), makeRow({ het: '9.999.999', bundle: 'true', sap: '' }), makeRow({ qty: '0', sku: 'S2', order: 'ORD002' })].join('\n');
-  const { rows, skipped } = P.parseCSV(csv, 100000);
+  const { rows, skipped } = P.parseCSV(csv);
   assert.equal(rows.length, 3);
   assert.equal(rows[0].valueHet, 45000);
   assert.equal(rows[0].qty, 2);
