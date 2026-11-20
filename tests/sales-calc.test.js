@@ -76,3 +76,26 @@ test('priceStats: nilai kosong dan harga ngaco', () => {
   assert.equal(s.max, 9999999);
   assert.equal(s.nulled, 1);
 });
+
+test('isStdSku: barcode Paragon 8993137xxxxxx vs kode lain', () => {
+  assert.equal(C.isStdSku('8993137000001'), true);
+  assert.equal(C.isStdSku('2030097805289'), false);
+  assert.equal(C.isStdSku('DUP8993137000001'), false);
+  assert.equal(C.isStdSku('3002518811'), false);
+});
+
+test('skuBreakdown: hitung per jenis SKU', () => {
+  const list = [
+    row({ sku: '8993137000001' }), row({ sku: '8993137000002' }),
+    row({ sku: '2030097805289' }), row({ sku: '2030097805290' }), row({ sku: '2030097805291' }),
+    row({ sku: 'DUP8993137000001' }),
+    row({ sku: '3002518811' })
+  ];
+  const bd = C.skuBreakdown(list);
+  assert.equal(bd.std, 2);
+  assert.equal(bd.mp, 3);
+  assert.equal(bd.dup, 1);
+  assert.equal(bd.other, 1);
+  assert.equal(bd.total, 7);
+  assert.equal(C.skuBreakdown([]).total, 0);
+});

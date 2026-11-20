@@ -100,7 +100,8 @@
     $('cOrders').textContent = fmt(s.orders);
     $('cOrdersS').textContent = '';
     $('cSkus').textContent = fmt(s.skus);
-    $('cSkusS').textContent = '';
+    const bd = C.skuBreakdown(list);
+    $('cSkusS').textContent = 'barcode: ' + fmt(bd.std) + ' | kode MP: ' + fmt(bd.mp) + (bd.dup ? ' | DUP: ' + fmt(bd.dup) : '') + (bd.other ? ' | lain: ' + fmt(bd.other) : '');
 
     const brands = [...new Set(list.map(r => r.brand).filter(Boolean))].sort();
     const mps = [...new Set(list.map(r => r.marketplace).filter(Boolean))].sort();
@@ -190,7 +191,10 @@
     for (const r of list) if (!skuMeta.has(r.sku)) skuMeta.set(r.sku, { sap: r.sapCode, brand: r.brand });
     for (const g of top) {
       const tr = el('tr'); const meta = skuMeta.get(g.key) || {};
+      const isStd = C.isStdSku(g.key);
+      const jenis = isStd ? 'barcode' : /^DUP/i.test(g.key) ? 'DUP' : /^2030/.test(g.key) ? 'kode MP' : 'lain';
       tr.appendChild(el('td', '', g.key));
+      tr.appendChild(el('td', 'pill ' + (isStd ? 'good' : 'mid'), jenis));
       tr.appendChild(el('td', '', meta.sap || '-'));
       tr.appendChild(el('td', '', meta.brand || '-'));
       tr.appendChild(el('td', 'n', fmt(g.qty)));

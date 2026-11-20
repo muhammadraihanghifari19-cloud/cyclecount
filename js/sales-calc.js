@@ -112,6 +112,22 @@
     return { count: all.length, min: all[0], median: all[Math.floor(all.length / 2)], max: all[all.length - 1], nulled };
   }
 
+  // Apakah SKU barcode Paragon standar (8993137 + 6 digit)?
+  function isStdSku(sku) { return /^8993137\d{6}$/.test(sku); }
+
+  // Hitung SKU unik berdasarkan jenisnya.
+  function skuBreakdown(list) {
+    const std = new Set(), mp = new Set(), dup = new Set(), other = new Set();
+    for (const r of list) {
+      const s = r.sku;
+      if (isStdSku(s)) std.add(s);
+      else if (/^DUP/i.test(s)) dup.add(s);
+      else if (/^2030/.test(s)) mp.add(s);
+      else other.add(s);
+    }
+    return { std: std.size, mp: mp.size, dup: dup.size, other: other.size, total: std.size + mp.size + dup.size + other.size };
+  }
+
   return { summarize, groupBy, groupSummary, topN, trendByDay, uniqueDates, uniqueMonths,
-           filterRows, linkToCc, priceStats };
+           filterRows, linkToCc, priceStats, isStdSku, skuBreakdown };
 });
