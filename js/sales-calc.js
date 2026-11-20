@@ -128,6 +128,76 @@
     return { std: std.size, mp: mp.size, dup: dup.size, other: other.size, total: std.size + mp.size + dup.size + other.size };
   }
 
+  // Kata-kata yang menandakan SKU non-jual (NFS, gift, sample, tester, GWP).
+  const NFS_RE = /\b(nfs|not[\s_-]*for[\s_-]*sale|gift|sample|tester|gwp|gratis)\b/i;
+  function isNfs(name) { return NFS_RE.test(name || ''); }
+
+  // --- FSN Classification ---
+  // Klasifikasi Fast / Slow / Non-moving berdasarkan rolling window dari semua data yang ada.
+  // Referensi: FSN analysis (inventory management), persentil berdasarkan distribusi qty per SKU.
+  //
+  // Batas:
+  //   Fast  : qty SKU ≥ p67 dari distribusi qty SKU yang terjual (top sepertiga)
+  //   Slow  : 0 < qty < p67
+  //   Non   : qty = 0 dalam seluruh rentang data
+  //
+  // ccSkus (optional Set): SKU yang ada di data cycle count. Kalau diisi, SKU di luar cc
+  // tetap diklasifikasi tapi ditandai "tidak ada di CC".
+  function fsnClassify(allRows, ccSkus) {
+    // Kumpulkan total qty per SKU dari seluruh data (semua bulan yang di-upload).
+    const qtyBySku = new Map();
+    for (const r of allRows) {
+      if (!r.sku) continue;
+      qtyBySku.set(r.sku, (qtyBySku.get(r.sku) || 0) + r.qty);
+    }
+    // Hitung p67 dari SKU yang terjual (qty > 0).
+    const sold = [...qtyBySku.values()].filter(v => v > 0).sort((a, b) => a - b);
+    const p67 = sold.length ? sold[Math.floor(sold.length * 0.67)] : 0;
+
+    const result = new Map();
+    for (const [sku, qty] of qtyBySku) {
+      result.set(sku, { qty, fsn: qty >= p67 ? 'F' : qty > 0 ? 'S' : 'N', inCc: !ccSkus || ccSkus.has(sku) });
+    }
+    // Tambahkan SKU yang ada di CC tapi tidak terjual sama sekali.
+    if (ccSkus) {
+      for (const sku of ccSkus) {
+        if (!result.has(sku)) result.set(sku, { qty: 0, fsn: 'N', inCc: true });
+      }
+    }
+    return { result, p67, soldCount: sold.length, totalSku: result.size };
+  }
+
+  // Label FSN yang terbaca.
+  function fsnLabel(code) {
+    return code === 'F' ? 'Fast' : code === 'S' ? 'Slow' : 'Non-moving';
+  }
+
+  // Ringkasan FSN per brand: berapa SKU F, S, N per brand, plus qty total.
+  function fsnByBrand(allRows, fsnMap) {
+    const brands = new Map();
+    for (const r of allRows) {
+      const sku = r.sku, brand = r.brand || '(kosong)';
+      if (!brands.has(brand)) brands.set(brand, { brand, F: new Set(), S: new Set(), N: new Set(), qty: 0 });
+      const b = brands.get(brand);
+      b.qty += r.qty;
+      const info = fsnMap.result.get(sku);
+      if (info) b[info.fsn].add(sku);
+    }
+    return [...brands.values()]
+      .map(b => ({ brand: b.brand, qty: b.qty, fast: b.F.size, slow: b.S.size, non: b.N.size, total: b.F.size + b.S.size + b.N.size }))
+      .sort((a, b) => b.qty - a.qty);
+  }
+
+  // Rentang tanggal dari data yang ada.
+  function dataRange(list) {
+    if (!list.length) return null;
+    let min = '9999', max = '';
+    for (const r of list) { if (r.date && r.date < min) min = r.date; if (r.date && r.date > max) max = r.date; }
+    const months = new Set(list.map(r => r.monthKey).filter(Boolean));
+    return { from: min, to: max, months: months.size };
+  }
+
   return { summarize, groupBy, groupSummary, topN, trendByDay, uniqueDates, uniqueMonths,
-           filterRows, linkToCc, priceStats, isStdSku, skuBreakdown };
+           filterRows, linkToCc, priceStats, isStdSku, skuBreakdown,
+           isNfs, fsnClassify, fsnLabel, fsnByBrand, dataRange };
 });

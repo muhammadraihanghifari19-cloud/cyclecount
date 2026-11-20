@@ -99,3 +99,73 @@ test('skuBreakdown: hitung per jenis SKU', () => {
   assert.equal(bd.total, 7);
   assert.equal(C.skuBreakdown([]).total, 0);
 });
+
+/* ---------- FSN dan NFS ---------- */
+
+test('isNfs: mendeteksi kata NFS, gift, sample, tester, GWP', () => {
+  assert.equal(C.isNfs('[NFS] Wardah Gift Set'), true);
+  assert.equal(C.isNfs('WARDAH Not For Sale Special Edition'), true);
+  assert.equal(C.isNfs('Emina GWP Pouch'), true);
+  assert.equal(C.isNfs('Wardah Acnederm Acne Spot Treatment'), false);
+  assert.equal(C.isNfs(''), false);
+  assert.equal(C.isNfs(null), false);
+});
+
+test('fsnClassify: p67, batas fast/slow, non-moving, SKU CC tidak terjual', () => {
+  // 9 SKU, qty 1,2,3,4,5,6,7,8,9. p67 = sold[6] = 7. Fast: >=7, Slow: 1-6, Non: 0.
+  const rows = [1,2,3,4,5,6,7,8,9].map((q,i) => row({ sku: 'S'+i, qty: q }));
+  const cc = new Set(['S0','S1','S2','CCONLY']);
+  const { result, p67, soldCount } = C.fsnClassify(rows, cc);
+  assert.equal(soldCount, 9);
+  assert.equal(p67, 7);
+  assert.equal(result.get('S0').fsn, 'S');   // qty 1 < 7
+  assert.equal(result.get('S6').fsn, 'F');   // qty 7 >= 7
+  assert.equal(result.get('S8').fsn, 'F');   // qty 9 >= 7
+  assert.equal(result.get('CCONLY').fsn, 'N');  // ada di CC tapi tidak terjual
+  assert.equal(result.get('CCONLY').qty, 0);
+  assert.equal(result.get('CCONLY').inCc, true);
+  assert.equal(result.get('S0').inCc, true);
+  // S3 tidak ada di ccSkus
+  assert.equal(result.get('S3').inCc, false);
+});
+
+test('fsnClassify: tanpa ccSkus, SKU luar CC tetap diklasifikasi', () => {
+  const rows = [row({ sku: 'A', qty: 10 }), row({ sku: 'B', qty: 1 })];
+  const { result } = C.fsnClassify(rows);
+  assert.equal(result.get('A').inCc, true);
+  assert.equal(result.get('B').inCc, true);
+});
+
+test('fsnClassify: daftar kosong tidak error', () => {
+  const { result, p67, soldCount } = C.fsnClassify([]);
+  assert.equal(result.size, 0);
+  assert.equal(p67, 0);
+  assert.equal(soldCount, 0);
+});
+
+test('fsnLabel: kode ke label terbaca', () => {
+  assert.equal(C.fsnLabel('F'), 'Fast');
+  assert.equal(C.fsnLabel('S'), 'Slow');
+  assert.equal(C.fsnLabel('N'), 'Non-moving');
+});
+
+test('fsnByBrand: hitung SKU FSN per brand, urut qty', () => {
+  const rows = [
+    row({ brand: 'A', sku: 'S1', qty: 10 }), row({ brand: 'A', sku: 'S2', qty: 2 }),
+    row({ brand: 'B', sku: 'S3', qty: 20 })
+  ];
+  const fsn = C.fsnClassify(rows);
+  const br = C.fsnByBrand(rows, fsn);
+  assert.equal(br[0].brand, 'B');
+  assert.equal(br[0].qty, 20);
+  assert.equal(br[1].fast + br[1].slow + br[1].non, 2);
+});
+
+test('dataRange: rentang tanggal dan jumlah bulan', () => {
+  const rows = [row({ date: '2026-10-14', monthKey: '2026-10' }), row({ date: '2026-10-01', monthKey: '2026-10' }), row({ date: '2026-11-05', monthKey: '2026-11' })];
+  const r = C.dataRange(rows);
+  assert.equal(r.from, '2026-10-01');
+  assert.equal(r.to, '2026-11-05');
+  assert.equal(r.months, 2);
+  assert.equal(C.dataRange([]), null);
+});

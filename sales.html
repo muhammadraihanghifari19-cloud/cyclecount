@@ -14,6 +14,12 @@
 .nav-link:hover { color: var(--side-ink); }
 table .cc-yes { color: var(--ok); font-weight: 600; }
 table .cc-no  { color: var(--mute); font-size: 11px; }
+.fsn-fast { color: var(--ok) !important; font-weight: 600; }
+.fsn-slow { color: var(--warn) !important; }
+.fsn-non  { color: var(--bad) !important; }
+table .pill.fsn-fast { background: var(--ok); color: #fff; }
+table .pill.fsn-slow { background: var(--warn); color: #fff; }
+table .pill.fsn-non  { background: var(--bad); color: #fff; }
 </style>
 <script>
   (function(){var t=null;try{t=localStorage.getItem('cc.theme');}catch(e){}
@@ -42,6 +48,13 @@ table .cc-no  { color: var(--mute); font-size: 11px; }
       </div>
       <div class="field"><label class="lab" for="fSearch">Cari SKU / brand</label><input id="fSearch" type="search" placeholder="Ketik untuk mencari"></div>
       <label class="check"><input id="fNonBundle" type="checkbox"> Hanya non-bundle (ada SAP)</label>
+      <div class="field"><label class="lab" for="fFsn">Klasifikasi pergerakan</label>
+        <select id="fFsn">
+          <option value="">Semua (F + S + N)</option>
+          <option value="F">Fast moving</option>
+          <option value="S">Slow moving</option>
+          <option value="N">Non-moving</option>
+        </select></div>
       <button id="reset" type="button">Reset filter</button>
       <div class="sep"></div>
       <button id="expCsv" type="button">Unduh CSV</button>
@@ -74,6 +87,7 @@ table .cc-no  { color: var(--mute); font-size: 11px; }
         <button type="button" data-tab="brand">Per Brand</button>
         <button type="button" data-tab="marketplace">Per Marketplace</button>
         <button type="button" data-tab="topsku">Top SKU</button>
+        <button type="button" data-tab="fsn">Fast/Slow/Non</button>
       </nav>
 
       <!-- RINGKASAN -->
@@ -116,8 +130,25 @@ table .cc-no  { color: var(--mute); font-size: 11px; }
           <h2>Top SKU (fast moving)</h2>
           <div class="hint" id="topSkuHint"></div>
           <div class="tablewrap"><table><thead><tr>
-            <th>SKU</th><th>Jenis</th><th>SAP Code</th><th>Brand</th><th class="n">Qty</th><th class="n">Omzet (Rp)</th><th class="n">Order</th><th id="ccColHead" class="hidden">CC Bulan</th><th id="ccAccHead" class="hidden">Akurasi CC</th>
+            <th>SKU</th><th>Jenis</th><th>SAP Code</th><th>Brand</th><th class="n">Qty</th><th class="n">Omzet (Rp)</th><th class="n">Order</th><th id="fsnColHead" class="hidden">FSN</th><th id="ccColHead" class="hidden">CC Bulan</th><th id="ccAccHead" class="hidden">Akurasi CC</th>
           </tr></thead><tbody id="tbTopSku"></tbody></table></div>
+        </div>
+      </section>
+      <!-- FSN TAB -->
+      <section class="tab hidden" id="tab-fsn">
+        <div class="panel">
+          <h2>Klasifikasi Fast / Slow / Non-moving</h2>
+          <div class="hint" id="fsnTotal"></div>
+          <div id="dataPeriodNote" class="note" style="color:var(--warn);margin-bottom:8px"></div>
+          <div class="chart tall"><canvas id="chFsn"></canvas></div>
+        </div>
+        <div class="panel">
+          <h2>Per brand</h2>
+          <div class="tablewrap"><table><thead><tr>
+            <th>Brand</th><th class="n">Qty</th>
+            <th class="n fsn-fast">Fast</th><th class="n fsn-slow">Slow</th><th class="n fsn-non">Non-moving</th>
+            <th class="n">Total SKU</th><th class="n">% Fast</th>
+          </tr></thead><tbody id="tbFsnBrand"></tbody></table></div>
         </div>
       </section>
     </div>

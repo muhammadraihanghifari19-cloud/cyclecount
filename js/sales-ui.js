@@ -3,7 +3,8 @@
   const P = window.SalesParse, C = window.SalesCalc, S = window.CCStore;
   const $ = id => document.getElementById(id);
   const PALETTE = ['#2563eb','#f59e0b','#10b981','#ec4899','#8b5cf6','#06b6d4','#ef4444','#84cc16','#f97316','#a855f7'];
-  const state = { rows: [], charts: {}, tab: 'ringkasan', ccMap: null, maxPrice: 100000 };
+    const state = { rows: [], charts: {}, tab: 'ringkasan', ccMap: null, maxPrice: 100000,
+                    fsn: null, dataRange: null };
 
   /* ---------- format ---------- */
   const fmt   = n => Number(n).toLocaleString('id-ID', { maximumFractionDigits: 0 });
@@ -35,7 +36,8 @@
       brand: $('fBrand').value, marketplace: $('fMp').value,
       dateFrom: $('fFrom').value || null, dateTo: $('fTo').value || null,
       q: $('fSearch').value,
-      bundleOnly: $('fNonBundle').checked
+      bundleOnly: $('fNonBundle').checked,
+      fsnFilter: $('fFsn').value || ''
     };
   }
 
@@ -57,6 +59,10 @@
       const { rows } = merged;
       if (!rows.length) { status('Tidak ada baris valid.', true); return; }
       state.rows = rows;
+      // Hitung FSN dari seluruh data (semua bulan yang di-upload).
+      const ccSkus = state.ccMap ? new Set([...state.ccMap.keys()].map(k => k.split('|')[0])) : null;
+      state.fsn = C.fsnClassify(rows, ccSkus);
+      state.dataRange = C.dataRange(rows);
 
       // Coba ambil data cycle count dari IndexedDB (dari dashboard cc yang sama browser-nya).
       state.ccMap = null;
@@ -112,6 +118,13 @@
     renderBrand(list);
     renderMp(list);
     renderTopSku(list);
+    renderFsn();
+    const dr = state.dataRange;
+    $('sub').textContent = (dr ? 'Data ' + dr.months + ' bulan (' + dr.from + ' s/d ' + dr.to + ')'
+      : fmt(list.length) + ' baris') +
+      (f.brand ? ' | ' + f.brand : '') + (f.marketplace ? ' | ' + f.marketplace : '');
+    $('dataPeriodNote').textContent = dr ? (dr.months < 2 ? '⚠ Hanya 1 bulan data. Upload data bulan lain untuk klasifikasi FSN lebih akurat.' :
+      dr.months < 3 ? 'ℹ ' + dr.months + ' bulan data. Disarankan 3 bulan untuk FSN yang stabil.' : '') : '';
   }
 
   /* ---------- grafik ---------- */
@@ -178,17 +191,28 @@
   }
 
   function renderTopSku(list) {
-    const top = C.topN(list, 'sku', 100);
+    const f = filters();
+    // Filter SKU NFS dari nama produk (tapi kita perlu nama produk per SKU dari VARIANT_FULLNAME)
+    const skuMeta = new Map();
+    for (const r of list) if (!skuMeta.has(r.sku)) skuMeta.set(r.sku, { sap: r.sapCode, brand: r.brand, name: r.sku });
+
+    // Filter berdasarkan FSN kalau dipilih
+    let topList = list;
+    if (f.fsnFilter && state.fsn) {
+      const fsnMap = state.fsn.result;
+      topList = list.filter(r => { const info = fsnMap.get(r.sku); return info && info.fsn === f.fsnFilter; });
+    }
+    const top = C.topN(topList, 'sku', 100);
     const hasCc = !!state.ccMap && state.ccMap.size > 0;
+    const hasFsn = !!state.fsn && state.fsn.result.size > 0;
     $('ccColHead').classList.toggle('hidden', !hasCc);
     $('ccAccHead').classList.toggle('hidden', !hasCc);
-    $('topSkuHint').textContent = top.length + ' SKU teratas (urut qty)' + (hasCc ? ', dengan data cycle count.' : '.') +
-      ' Filter non-bundle untuk melihat SKU yang bisa dihubungkan ke cycle count.';
+    $('fsnColHead').classList.toggle('hidden', !hasFsn);
+    $('topSkuHint').textContent = top.length + ' SKU teratas (urut qty)' +
+      (f.fsnFilter ? ' | filter: ' + C.fsnLabel(f.fsnFilter) : '') +
+      (hasFsn ? ' | FSN dari ' + (state.dataRange ? state.dataRange.months + ' bulan' : 'seluruh data') : '') + '.';
     const tb = $('tbTopSku'); tb.textContent = '';
-    if (!top.length) { emptyRow(tb, 8, 'Tidak ada data.'); return; }
-    // Ambil contoh baris per SKU untuk info SAP dan brand.
-    const skuMeta = new Map();
-    for (const r of list) if (!skuMeta.has(r.sku)) skuMeta.set(r.sku, { sap: r.sapCode, brand: r.brand });
+    if (!top.length) { emptyRow(tb, 8 + (hasCc ? 2 : 0) + (hasFsn ? 1 : 0), 'Tidak ada data.'); return; }
     for (const g of top) {
       const tr = el('tr'); const meta = skuMeta.get(g.key) || {};
       const isStd = C.isStdSku(g.key);
@@ -200,6 +224,12 @@
       tr.appendChild(el('td', 'n', fmt(g.qty)));
       tr.appendChild(el('td', 'n', g.omzetRows ? fmtRp(g.omzet) : '-'));
       tr.appendChild(el('td', 'n', fmt(g.orders)));
+      if (hasFsn) {
+        const info = state.fsn.result.get(g.key);
+        const fsn = info ? info.fsn : '?';
+        const fsnCls = fsn === 'F' ? 'fsn-fast' : fsn === 'S' ? 'fsn-slow' : 'fsn-non';
+        tr.appendChild(el('td', 'pill ' + fsnCls, C.fsnLabel(fsn)));
+      }
       if (hasCc) {
         const cc = state.ccMap.get(g.key);
         const tdM = el('td', 'n ' + (cc ? 'cc-yes' : 'cc-no'), cc ? String(cc.ccMonths) + ' bln' : '—');
@@ -219,6 +249,38 @@
     Object.values(state.charts).forEach(c => { if (c && c.resize) c.resize(); });
   }
 
+  /* ---------- FSN tab ---------- */
+  function renderFsn() {
+    if (!state.fsn) return;
+    const br = C.fsnByBrand(state.rows, state.fsn);
+    // Ringkasan total
+    let tF = 0, tS = 0, tN = 0;
+    for (const b of br) { tF += b.fast; tS += b.slow; tN += b.non; }
+    $('fsnTotal').textContent = 'Fast: ' + fmt(tF) + '  Slow: ' + fmt(tS) + '  Non-moving: ' + fmt(tN) +
+      '  |  p67 = ' + fmt(state.fsn.p67) + ' qty';
+    // Tabel per brand
+    const tb = $('tbFsnBrand'); tb.textContent = '';
+    for (const b of br) {
+      const tr = el('tr');
+      tr.appendChild(el('td', '', b.brand));
+      tr.appendChild(el('td', 'n', fmt(b.qty)));
+      tr.appendChild(el('td', 'n fsn-fast', fmt(b.fast)));
+      tr.appendChild(el('td', 'n fsn-slow', fmt(b.slow)));
+      tr.appendChild(el('td', 'n fsn-non', fmt(b.non)));
+      tr.appendChild(el('td', 'n', fmt(b.total)));
+      tr.appendChild(el('td', 'n', b.total ? (b.fast / b.total * 100).toFixed(0) + '%' : '-'));
+      tb.appendChild(tr);
+    }
+    // Grafik batang tumpuk per brand
+    const labels = br.slice(0, 15).map(x => x.brand);
+    const sub = br.slice(0, 15);
+    mkChart('chFsn', 'bar', labels, [
+      { label: 'Fast', data: sub.map(x => x.fast), backgroundColor: css('--ok'), stack: 's' },
+      { label: 'Slow', data: sub.map(x => x.slow), backgroundColor: css('--warn'), stack: 's' },
+      { label: 'Non-moving', data: sub.map(x => x.non), backgroundColor: css('--bad'), stack: 's' }
+    ], { legend: true, stacked: true });
+  }
+
   /* ---------- ekspor ---------- */
   $('expCsv').onclick = () => {
     const f = filters(); const list = C.filterRows(state.rows, f);
@@ -235,7 +297,7 @@
   };
 
   /* ---------- event ---------- */
-  ['fBrand', 'fMp', 'fFrom', 'fTo', 'fNonBundle'].forEach(id => $(id).onchange = render);
+  ['fBrand', 'fMp', 'fFrom', 'fTo', 'fNonBundle', 'fFsn'].forEach(id => $(id).onchange = render);
   $('fSearch').oninput = render;
   $('reset').onclick = () => {
     $('fBrand').value = ''; $('fMp').value = ''; $('fSearch').value = '';
