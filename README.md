@@ -2,7 +2,26 @@
 
 Dashboard stock accuracy dari hasil cycle count gudang Tegal (tab "CC BY HERON <BULAN> 26" di spreadsheet CYCLE COUNT TEGAL). Untuk pemakaian internal.
 
-## Cara pakai
+## Sales Dashboard
+
+Buka `sales.html` di browser. Upload satu atau beberapa file CSV dari Magpie (bisa pilih banyak sekaligus). Data digabung otomatis, baris duplikat dari file yang tumpang tindih dibuang.
+
+**Filter di sidebar:** brand, marketplace, rentang tanggal, pencarian, hanya non-bundle (punya kode SAP), dan batas harga wajar (bawaan Rp 100.000 — baris dengan VALUE_HET di atas itu tidak dihitung di omzet tapi qty tetap dihitung).
+
+**Tab:**
+- **Ringkasan:** qty dan omzet per hari, qty per brand.
+- **Per Brand:** tabel dan grafik qty + omzet per brand.
+- **Per Marketplace:** tabel dan grafik pie qty dan omzet.
+- **Top SKU:** 100 SKU paling laku (urut qty), dengan kolom kode SAP dan brand. Kalau data cycle count sudah ada di browser (dari dashboard CC, dicentang "Simpan di perangkat ini"), kolom tambahan menampilkan berapa bulan SKU itu dihitung di cycle count dan akurasi terakhirnya.
+
+**Format CSV:** kolom `ORDER_TIMESTAMP` berformat `"25 Oct, 2026, 13:08"`, `VALUE_HET` bertitik ribuan (`45.000`). Parser menangani keduanya secara otomatis.
+
+**Catatan data Oktober:**
+- File CSV dari Magpie bisa terpotong di 1.048.575 baris. Kalau terpotong, pecah per rentang tanggal yang lebih pendek sebelum mengunduh.
+- Sekitar 83% baris adalah bundle (`IS_BUNDLE=true`) tanpa kode SAP. Filter "Hanya non-bundle" menampilkan baris yang bisa dihubungkan ke data cycle count.
+- Baris dengan harga di atas batas (misalnya 9.999.999) tidak dihitung di omzet.
+
+
 
 1. Buka `index.html` di browser (klik dua kali, tidak perlu server).
 2. Klik **Upload .xlsx** dan pilih file CYCLE COUNT TEGAL.

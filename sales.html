@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sales Dashboard</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+.file-list { margin: 8px 0; font-size: 12px; color: var(--side-mute); }
+.file-list li { padding: 2px 0; list-style: none; }
+.file-list li span { float: right; color: var(--ok); }
+.file-list li.warn span { color: var(--warn); }
+.nav-link { display: block; margin-top: 10px; color: var(--side-mute); font-size: 12px; text-align: center; text-decoration: none; }
+.nav-link:hover { color: var(--side-ink); }
+table .cc-yes { color: var(--ok); font-weight: 600; }
+table .cc-no  { color: var(--mute); font-size: 11px; }
+</style>
+<script>
+  (function(){var t=null;try{t=localStorage.getItem('cc.theme');}catch(e){}
+  if(!t)t=window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';
+  document.documentElement.setAttribute('data-theme',t);})();
+</script>
+</head>
+<body>
+<div class="layout">
+  <aside class="side">
+    <div class="logo">Sales Dashboard<small>Penjualan dari Magpie</small></div>
+
+    <label class="btn primary" style="cursor:pointer">Upload CSV
+      <input id="file" type="file" accept=".csv,.txt" multiple hidden>
+    </label>
+    <ul id="fileList" class="file-list"></ul>
+    <div id="status" class="status"></div>
+
+    <div id="controls" class="hidden">
+      <div class="field"><label class="lab" for="fBrand">Brand</label><select id="fBrand"></select></div>
+      <div class="field"><label class="lab" for="fMp">Marketplace</label><select id="fMp"></select></div>
+      <div class="field">
+        <label class="lab">Rentang tanggal</label>
+        <input id="fFrom" type="date" style="width:100%;margin-bottom:4px">
+        <input id="fTo" type="date" style="width:100%">
+      </div>
+      <div class="field"><label class="lab" for="fSearch">Cari SKU / brand</label><input id="fSearch" type="search" placeholder="Ketik untuk mencari"></div>
+      <label class="check"><input id="fNonBundle" type="checkbox" checked> Hanya non-bundle (ada SAP)</label>
+      <div class="field"><label class="lab" for="fMaxPrice">Batas harga wajar (Rp)</label><input id="fMaxPrice" type="number" min="1000" step="1000" value="100000"></div>
+      <button id="reset" type="button">Reset filter</button>
+      <div class="sep"></div>
+      <button id="expCsv" type="button">Unduh CSV</button>
+    </div>
+
+    <div class="sep"></div>
+    <button id="theme" type="button">Mode gelap</button>
+    <a href="index.html" class="nav-link">← Cycle Count Dashboard</a>
+  </aside>
+
+  <main>
+    <h1 class="page-title">Penjualan Magpie</h1>
+    <div id="sub" class="sub">Upload CSV untuk mulai</div>
+
+    <div id="empty" class="empty">
+      Upload satu atau beberapa file CSV dari Magpie lewat tombol di kiri.<br>
+      Data dibaca di browser dan tidak dikirim ke mana pun.
+    </div>
+
+    <div id="app" class="hidden">
+      <div class="cards">
+        <div class="card"><div class="k">Total qty</div><div class="v" id="cQty">-</div><div class="s" id="cQtyS"></div></div>
+        <div class="card"><div class="k">Omzet (Rp)</div><div class="v" id="cOmzet">-</div><div class="s" id="cOmzetS"></div></div>
+        <div class="card"><div class="k">Order unik</div><div class="v" id="cOrders">-</div><div class="s" id="cOrdersS"></div></div>
+        <div class="card"><div class="k">SKU unik</div><div class="v" id="cSkus">-</div><div class="s" id="cSkusS"></div></div>
+      </div>
+
+      <nav class="tabs no-print" id="tabs">
+        <button type="button" data-tab="ringkasan" class="on">Ringkasan</button>
+        <button type="button" data-tab="brand">Per Brand</button>
+        <button type="button" data-tab="marketplace">Per Marketplace</button>
+        <button type="button" data-tab="topsku">Top SKU</button>
+      </nav>
+
+      <!-- RINGKASAN -->
+      <section class="tab" id="tab-ringkasan">
+        <div class="panel"><h2>Qty per hari</h2><div class="chart tall"><canvas id="chDay"></canvas></div></div>
+        <div class="grid">
+          <div class="panel"><h2>Omzet per hari (Rp)</h2><div class="chart"><canvas id="chDayOmzet"></canvas></div></div>
+          <div class="panel"><h2>Qty per brand</h2><div class="chart"><canvas id="chBrandSum"></canvas></div></div>
+        </div>
+      </section>
+
+      <!-- PER BRAND -->
+      <section class="tab hidden" id="tab-brand">
+        <div class="panel">
+          <h2>Qty dan omzet per brand</h2>
+          <div class="tablewrap"><table><thead><tr>
+            <th>Brand</th><th class="n">Baris</th><th class="n">Qty</th><th class="n">Omzet (Rp)</th><th class="n">Order unik</th><th class="n">SKU unik</th>
+          </tr></thead><tbody id="tbBrand"></tbody></table></div>
+        </div>
+        <div class="panel"><h2>Qty per brand</h2><div class="chart tall"><canvas id="chBrandBar"></canvas></div></div>
+      </section>
+
+      <!-- PER MARKETPLACE -->
+      <section class="tab hidden" id="tab-marketplace">
+        <div class="panel">
+          <h2>Qty dan omzet per marketplace</h2>
+          <div class="tablewrap"><table><thead><tr>
+            <th>Marketplace</th><th class="n">Baris</th><th class="n">Qty</th><th class="n">Omzet (Rp)</th><th class="n">Order unik</th>
+          </tr></thead><tbody id="tbMp"></tbody></table></div>
+        </div>
+        <div class="grid">
+          <div class="panel"><h2>Qty per marketplace</h2><div class="chart"><canvas id="chMpQty"></canvas></div></div>
+          <div class="panel"><h2>Omzet per marketplace</h2><div class="chart"><canvas id="chMpOmzet"></canvas></div></div>
+        </div>
+      </section>
+
+      <!-- TOP SKU -->
+      <section class="tab hidden" id="tab-topsku">
+        <div class="panel">
+          <h2>Top SKU (fast moving)</h2>
+          <div class="hint" id="topSkuHint"></div>
+          <div class="tablewrap"><table><thead><tr>
+            <th>SKU</th><th>SAP Code</th><th>Brand</th><th class="n">Qty</th><th class="n">Omzet (Rp)</th><th class="n">Order</th><th id="ccColHead" class="hidden">CC Bulan</th><th id="ccAccHead" class="hidden">Akurasi CC</th>
+          </tr></thead><tbody id="tbTopSku"></tbody></table></div>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<script src="lib/chart.umd.js"></script>
+<script src="js/sales-parse.js"></script>
+<script src="js/sales-calc.js"></script>
+<script src="js/store.js"></script>
+<script src="js/sales-ui.js"></script>
+</body>
+</html>
